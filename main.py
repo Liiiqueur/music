@@ -1,7 +1,7 @@
 import requests
 
 API_KEY = '3165ed803092cb7d6e1087d1a389c45e'
-API_URL = 'http://ws.audioscrobbler.com/2.0/'
+API_URL = 'https://liiiqueur.github.io/music/main.html'
 
 # 예제: 사용자의 최근 듣기 기록 가져오기
 params = {
