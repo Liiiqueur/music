@@ -55,3 +55,57 @@ async def get_artist_top_tracks(artist_name: str):
     else:
         raise HTTPException(status_code=response.status_code, detail="Failed to fetch artist top tracks")
 
+@app.get("/track/{track_name}")
+async def get_track_info_and_similar_artists(track_name: str, artist: str):
+    params = {
+        'method': 'track.getInfo',
+        'track': track_name,
+        'artist': artist,
+        'api_key': API_KEY,
+        'format': 'json'
+    }
+
+    response = requests.get(LAST_FM_API_URL, params=params)
+
+    if response.status_code == 200:
+        data = response.json()
+        artist_info = data['track']['artist'] if 'artist' in data['track'] else None
+        # 비슷한 아티스트 정보 가져오기
+        if artist_info:
+            similar_artists_params = {
+                'method': 'artist.getSimilar',
+                'artist': artist_info['name'],
+                'api_key': API_KEY,
+                'format': 'json'
+            }
+            similar_artists_response = requests.get(LAST_FM_API_URL, params=similar_artists_params)
+            if similar_artists_response.status_code == 200:
+                similar_artists_data = similar_artists_response.json()
+                similar_artists = similar_artists_data['similarartists']['artist'] if 'similarartists' in similar_artists_data else []
+            else:
+                similar_artists = []
+        else:
+            similar_artists = []
+
+        # 비슷한 트랙 정보 가져오기
+        similar_tracks_params = {
+            'method': 'track.getSimilar',
+            'track': track_name,
+            'artist': artist,
+            'api_key': API_KEY,
+            'format': 'json'
+        }
+        similar_tracks_response = requests.get(LAST_FM_API_URL, params=similar_tracks_params)
+        if similar_tracks_response.status_code == 200:
+            similar_tracks_data = similar_tracks_response.json()
+            similar_tracks = similar_tracks_data['similartracks']['track'] if 'similartracks' in similar_tracks_data else []
+        else:
+            similar_tracks = []
+
+        return {
+            "artist_info": artist_info,
+            "similar_artists": similar_artists,
+            "similar_tracks": similar_tracks
+        }
+    else:
+        raise HTTPException(status_code=response.status_code, detail="Failed to fetch track info")
