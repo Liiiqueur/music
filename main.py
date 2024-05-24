@@ -1,6 +1,7 @@
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, HTTPException, Request, Depends
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 import requests
 
 app = FastAPI()
@@ -115,7 +116,7 @@ async def get_artist_top_tracks_data(artist_name: str):
             } for track in data['toptracks']['track']]
     return []
 
-@app.get("/track/{track_name}")
+@app.get("/track/{track_name}", response_class=HTMLResponse)
 async def get_track_info_and_similar_artists(request: Request, track_name: str, artist: str):
     params = {
         'method': 'track.getInfo',
@@ -160,6 +161,10 @@ async def get_track_info_and_similar_artists(request: Request, track_name: str, 
         })
     else:
         raise HTTPException(status_code=response.status_code, detail="트랙 정보를 가져오지 못했습니다")
+
+@app.get("/track_search")
+async def track_search(track_name: str, artist_name: str):
+    return RedirectResponse(url=f"/track/{track_name}?artist={artist_name}")
 
 @app.get("/track/{track_name}/lyrics")
 async def get_track_lyrics(track_name: str, artist: str):

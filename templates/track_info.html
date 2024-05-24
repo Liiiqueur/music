@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ track_info.name }} - 트랙 정보</title>
+</head>
+<body>
+    <h1>{{ track_info.name }} - 트랙 정보</h1>
+    <p>아티스트: <a href="{{ track_info.artist.url }}">{{ track_info.artist.name }}</a></p>
+    <p>청취자 수: {{ track_info.listeners }}</p>
+    <p>시청 횟수: {{ track_info.playcount }}</p>
+    <a href="{{ track_info.url }}">Last.fm에서 보기</a>
+    
+    <h2>유사한 아티스트</h2>
+    <ul>
+    {% for artist in similar_artists %}
+        <li><a href="/artist_info?artist_name={{ artist.name }}">{{ artist.name }}</a></li>
+    {% endfor %}
+    </ul>
+
+    <h2>유사한 트랙</h2>
+    <ul>
+    {% for track in similar_tracks %}
+        <li><a href="{{ track.url }}">{{ track.name }}</a> - {{ track.artist.name }}</li>
+    {% endfor %}
+    </ul>
+
+    <a href="/">홈으로</a>
+</body>
+</html>

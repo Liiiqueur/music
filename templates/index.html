@@ -1,16 +1,16 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>음악 추천 스테이션</title>
+    <title>뮤직 검색</title>
 </head>
 <body>
-    <h1>개인 감정 음악 추천 스테이션</h1>
-    <form action="/artist_info" method="get">
-        <label for="artist">아티스트 이름 입력:</label>
-        <input type="text" id="artist" name="artist_name" required>
-        <button type="submit">아티스트 정보 가져오기</button>
+    <h1>뮤직 검색</h1>
+    <form action="/track_search" method="get">
+        <label for="track_name">트랙 이름:</label>
+        <input type="text" id="track_name" name="track_name">
+        <label for="artist_name">아티스트 이름:</label>
+        <input type="text" id="artist_name" name="artist_name">
+        <button type="submit">검색</button>
     </form>
 </body>
 </html>
