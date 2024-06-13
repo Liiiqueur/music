@@ -1,16 +1,19 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>뮤직 검색</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Main Page</title>
+    <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-    <h1>뮤직 검색</h1>
-    <form action="/track_search" method="get">
-        <label for="track_name">아티스트 이름:</label>
-        <input type="text" id="track_name" name="track_name">
-        <label for="artist_name">트랙 이름:</label>
-        <input type="text" id="artist_name" name="artist_name">
-        <button type="submit">검색</button>
-    </form>
+    <div class="container">
+        <h1>Welcome to the Music Information Service</h1>
+        <form action="/artist_info" method="get">
+            <label for="artist_name">Search for an Artist:</label>
+            <input type="text" id="artist_name" name="artist_name" required>
+            <button type="submit">Search</button>
+        </form>
+    </div>
 </body>
 </html>

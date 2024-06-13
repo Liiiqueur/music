@@ -1,31 +1,42 @@
-from fastapi import FastAPI, HTTPException, Request, Depends
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
 import requests
+import logging
 
 app = FastAPI()
 
-API_KEY = '3165ed803092cb7d6e1087d1a389c45e'
+LAST_FM_API_KEY = '3165ed803092cb7d6e1087d1a389c45e'
 LAST_FM_API_URL = 'http://ws.audioscrobbler.com/2.0/'
 
+YOUTUBE_API_KEY = 'YOUR_YOUTUBE_API_KEY'
+YOUTUBE_API_URL = 'https://www.googleapis.com/youtube/v3/search'
+
 templates = Jinja2Templates(directory="templates")
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+logging.basicConfig(level=logging.INFO)
+
+# 하드코딩된 링크 사전
+HARDCODED_LINKS = {
+    ('NewJeans', 'Hype Boy'): 'https://www.youtube.com/watch?v=MwIZz8zadqo'
+}
 
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
-@app.get("/artist_info")
+@app.get("/artist_info", response_class=HTMLResponse)
 async def artist_info(request: Request, artist_name: str):
     params = {
         'method': 'artist.getInfo',
         'artist': artist_name,
-        'api_key': API_KEY,
+        'api_key': LAST_FM_API_KEY,
         'format': 'json'
     }
-
     response = requests.get(LAST_FM_API_URL, params=params)
-    
     if response.status_code != 200:
         raise HTTPException(status_code=response.status_code, detail="아티스트 정보를 가져오지 못했습니다")
 
@@ -43,154 +54,62 @@ async def artist_info(request: Request, artist_name: str):
     })
 
 @app.get("/artist/{artist_name}/toptracks", response_class=HTMLResponse)
-async def get_artist_top_tracks(request: Request, artist_name: str):
+async def artist_top_tracks(request: Request, artist_name: str):
     params = {
         'method': 'artist.getTopTracks',
         'artist': artist_name,
-        'api_key': API_KEY,
+        'api_key': LAST_FM_API_KEY,
         'format': 'json'
     }
-
     response = requests.get(LAST_FM_API_URL, params=params)
+    if response.status_code != 200:
+        logging.error(f"Failed to fetch top tracks for {artist_name}: {response.status_code}")
+        raise HTTPException(status_code=response.status_code, detail="인기 트랙 정보를 가져오지 못했습니다")
 
-    if response.status_code == 200:
-        data = response.json()
-        if 'toptracks' in data:
-            top_tracks = [{
-                'rank': track['@attr']['rank'],
-                '곡명': track['name'],
-                '시청 횟수': track['playcount'],
-                '청취자 수': track['listeners'],
-                'url': track['url']
-            } for track in data['toptracks']['track']]
-        else:
-            top_tracks = []
+    data = response.json()
+    top_tracks = []
+    if 'toptracks' in data:
+        top_tracks = data['toptracks']['track']
     else:
-        raise HTTPException(status_code=response.status_code, detail="아티스트의 인기 트랙을 가져오지 못했습니다")
+        logging.error(f"No top tracks found for {artist_name}")
 
-    # 유사한 아티스트와 관련된 트랙 정보 가져오기
-    similar_artists = await get_similar_artists(artist_name)
-    related_tracks = []
-    for artist in similar_artists:
-        related_tracks += await get_artist_top_tracks_data(artist['name'])
+    # YouTube 직캠 링크 추가
+    for track in top_tracks:
+        youtube_link = await get_youtube_fancam_link(track['name'], artist_name)
+        track['youtube_link'] = youtube_link
 
     return templates.TemplateResponse("artist_toptracks.html", {
         "request": request,
         "artist_name": artist_name,
-        "top_tracks": top_tracks,
-        "related_tracks": related_tracks
+        "top_tracks": top_tracks
     })
 
-async def get_similar_artists(artist_name: str):
+async def get_youtube_fancam_link(track_name: str, artist_name: str):
+    # 하드코딩된 링크 확인
+    if (artist_name, track_name) in HARDCODED_LINKS:
+        return HARDCODED_LINKS[(artist_name, track_name)]
+    
+    query = f"{track_name} {artist_name} 직캠"
     params = {
-        'method': 'artist.getSimilar',
-        'artist': artist_name,
-        'api_key': API_KEY,
-        'format': 'json'
+        'part': 'snippet',
+        'q': query,
+        'key': YOUTUBE_API_KEY,
+        'maxResults': 1,
+        'type': 'video'
     }
-    response = requests.get(LAST_FM_API_URL, params=params)
-    if response.status_code == 200:
-        data = response.json()
-        return data['similarartists']['artist'] if 'similarartists' in data else []
-    else:
-        return []
+    response = requests.get(YOUTUBE_API_URL, params=params)
+    
+    logging.info(f"Requesting YouTube API with query: {query}")
+    logging.info(f"YouTube API response status: {response.status_code}")
+    logging.info(f"YouTube API response: {response.json()}")
+    
+    if response.status_code != 200:
+        logging.error(f"Failed to fetch YouTube video for {track_name} by {artist_name}: {response.status_code}")
+        return None
 
-async def get_artist_top_tracks_data(artist_name: str):
-    params = {
-        'method': 'artist.getTopTracks',
-        'artist': artist_name,
-        'api_key': API_KEY,
-        'format': 'json'
-    }
-    response = requests.get(LAST_FM_API_URL, params=params)
-    if response.status_code == 200:
-        data = response.json()
-        if 'toptracks' in data:
-            return [{
-                'artist': artist_name,
-                'rank': track['@attr']['rank'],
-                '곡명': track['name'],
-                '시청 횟수': track['playcount'],
-                '청취자 수': track['listeners'],
-                'url': track['url']
-            } for track in data['toptracks']['track']]
-    return []
-
-@app.get("/track/{track_name}", response_class=HTMLResponse)
-async def get_track_info_and_similar_artists(request: Request, track_name: str, artist: str):
-    params = {
-        'method': 'track.getInfo',
-        'track': track_name,
-        'artist': artist,
-        'api_key': API_KEY,
-        'format': 'json'
-    }
-
-    response = requests.get(LAST_FM_API_URL, params=params)
-
-    if response.status_code == 200:
-        data = response.json()
-        track_info = data.get('track')
-        artist_info = track_info.get('artist') if track_info else None
-
-        if artist_info:
-            similar_artists = await get_similar_artists(artist_info['name'])
-        else:
-            similar_artists = []
-
-        similar_tracks_params = {
-            'method': 'track.getSimilar',
-            'track': track_name,
-            'artist': artist,
-            'api_key': API_KEY,
-            'format': 'json'
-        }
-        similar_tracks_response = requests.get(LAST_FM_API_URL, params=similar_tracks_params)
-        if similar_tracks_response.status_code == 200:
-            similar_tracks_data = similar_tracks_response.json()
-            similar_tracks = similar_tracks_data['similartracks']['track'] if 'similartracks' in similar_tracks_data else []
-        else:
-            similar_tracks = []
-
-        return templates.TemplateResponse("track_info.html", {
-            "request": request,
-            "track_info": track_info,
-            "artist_info": artist_info,
-            "similar_artists": similar_artists,
-            "similar_tracks": similar_tracks
-        })
-    else:
-        raise HTTPException(status_code=response.status_code, detail="트랙 정보를 가져오지 못했습니다")
-
-@app.get("/track_search")
-async def track_search(track_name: str, artist_name: str):
-    return RedirectResponse(url=f"/track/{track_name}?artist={artist_name}")
-
-@app.get("/track/{track_name}/lyrics")
-async def get_track_lyrics(track_name: str, artist: str):
-    return {"lyrics": "가사 정보가 여기 표시됩니다."}
-
-@app.get("/artist/{artist_name}/albums")
-async def get_artist_albums(artist_name: str):
-    params = {
-        'method': 'artist.getTopAlbums',
-        'artist': artist_name,
-        'api_key': API_KEY,
-        'format': 'json'
-    }
-
-    response = requests.get(LAST_FM_API_URL, params=params)
-
-    if response.status_code == 200:
-        data = response.json()
-        if 'topalbums' in data:
-            albums = [{
-                'album_name': album['name'],
-                'playcount': album['playcount'],
-                'url': album['url']
-            } for album in data['topalbums']['album']]
-            return {"albums": albums}
-        else:
-            return {"albums": []}
-    else:
-        raise HTTPException(status_code=response.status_code, detail="아티스트의 앨범 정보를 가져오지 못했습니다")
+    data = response.json()
+    if 'items' in data and len(data['items']) > 0:
+        video_id = data['items'][0]['id']['videoId']
+        return f"https://www.youtube.com/watch?v={video_id}"
+    logging.error(f"No YouTube video found for {track_name} by {artist_name}")
+    return None
